@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.12...3.30)
+cmake_minimum_required(VERSION 3.12)
 
-set(NAME blinky) # *** Replace this with your project's name. ***
+set(NAME youme-transformer)
 
 set(PICO_PLATFORM rp2350)
-set(PICO_BOARD pico2_w)
+set(PICO_BOARD pico2)
 
 # Set the default build type to Debug if not specified
 if(NOT CMAKE_BUILD_TYPE)
@@ -24,30 +24,42 @@ include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
 # Compiler settings
 project(${NAME} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 add_compile_options(-Wall)
 
 pico_sdk_init()
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
+
 set(SOURCE_FILES
-    src/blinky.cpp # *** Replace this with your source files. ***
+    src/passthrough.cpp
 )
 
 add_executable(${NAME}
     ${SOURCE_FILES}
 )
 
-# Be pedantic about warnings and sanitize for undefined behaviour.
-set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_OPTIONS "-Wextra;-Wpedantic;-fsanitize=undefined")
+# Be pedantic about warnings.
+set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_OPTIONS "-Wextra;-Wpedantic")
+
+target_include_directories(${NAME} PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
 
 target_link_libraries(${NAME}
     pico_stdlib
-    pico_cyw43_arch_none
+    ring_buffer_lib
+    midi_uart_lib
 )
 
 target_compile_definitions(${NAME} PRIVATE)
 
 pico_add_extra_outputs(${NAME})
+
+# By default, UART0 is reserved for stdio.
+# It needs to be disabled for YouMeTransformer
+# v1.0 hardware, which uses UART0 for MIDI.
+pico_enable_stdio_uart(${NAME} 0)
 
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/${NAME}.uf2
