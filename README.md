@@ -19,7 +19,28 @@ This repository is released under the BSD-3 license.
 
 ### Install OpenOCD, Picotool, and the Compiler Toolchain
 
-TODO: Add instructions.
+Raspberry Pi has provided a [Getting Started with Raspberry Pi Pico-series](https://pip-assets.raspberrypi.com/categories/610-raspberry-pi-pico/documents/RP-008276-DS-1-getting-started-with-pico.pdf) PDF that walks through the process of installing the necessary dependencies manually.
+
+#### Recommended: Use the Raspberry Pi Pico VS Code Extension
+
+If you use VS Code, there is a Raspberry Pi Pico extension that will automatically install or update the Pico SDK, toolchain, OpenOCD, picotool, CMake, and other necessary dependencies in ```~/.pico-sdk```.
+
+1. Open VS Code
+2. Install the official "Raspberry Pi Pico" extension from Raspberry Pi.
+3. Open the Raspberry Pi Pico Project: Quick Access panel
+4. Generate a new C/C++Pico project, which will cause the extension to install all necessary dependencies
+5. Delete the project
+6. Set your environment variables to point to the correct versions of the SDK, OpenOCD, and the ARM toolchain as described below.
+
+#### Other Ways
+
+##### Windows
+
+Nikhil Dabas provides a [Windows GUI installer for the Pico toolchain](https://www.raspberrypi.com/news/raspberry-pi-pico-windows-installer/).
+
+##### Raspberry Pi OS
+
+Raspberry Pi provides a [setup script for Raspberry Pi OS-based Linux](https://github.com/raspberrypi/pico-setup).
 
 ### Update Submodules
 
@@ -30,15 +51,20 @@ Init and recursively update all submodules:
 
 The following environment variables need to be set:
 
-1. ```PICO_OPENOCD_PATH``` should point to a directory containing an RP2350-compatible version of OpenOCD (which should contain both the openocd binary and its scripts directory).
-2. ```PICO_TOOLCHAIN_PATH``` should point to a directory containing the arm-eabi-none GCC cross-compiler.
+The following environment variables need to be set:
+
+1. ```PICO_OPENOCD_PATH``` should point to a directory containing an RP2350-compatible version of OpenOCD (which should contain both the openocd binary and its scripts directory). On macOS, the VS Code extension will install this in ```~/.pico-sdk/openocd/<version>```.
+2. ```PICO_TOOLCHAIN_PATH``` should point to a directory containing the arm-eabi-none GCC cross-compiler. On macOS, the VS Code extension will install this in ```~/.pico-sdk/toolchain/<version>```.
+3. ```picotool_DIR``` should be set if you don't have picotool installed globally (the default if installed by the VS Code extension) and don't want it to be downloaded each time you build the project. On macOS, the VS Code extension will install picotool in ```~/.sdk/picotool/<version>```
 
 #### Example Environment Variables
 
 ```sh
 PICO_TOOLS_PATH=~/.pico-sdk
-export PICO_TOOLCHAIN_PATH=$PICO_TOOLS_PATH/toolchain/13_3_Rel1
+export PICO_SDK_PATH=$PICO_TOOLS_PATH/sdk/2.2.0
+export PICO_TOOLCHAIN_PATH=$PICO_TOOLS_PATH/toolchain/14_2_Rel1
 export PICO_OPENOCD_PATH=$PICO_TOOLS_PATH/openocd/0.12.0+dev
+export picotool_DIR=$PICO_TOOLS_PATH/picotool/2.2.0-a4
 ```
 
 ### Configuring the Build
@@ -113,6 +139,40 @@ docker run -v `pwd`:/project --rm youme-transformer ./docker-compile.sh
 docker run -v `pwd`:/project -it --rm youme-transformer
 ```
 
-#### Caveats
+Updating
 
-The Docker and local builds share the same CMake build directory, but aren't compatible. Make sure to clean before switching between them.
+If you need to update to a newer version of the Pico SDK, here's the process for updating the submodules:
+
+### Update the pico-sdk Submodule
+
+```sh
+cd lib/pico-sdk
+
+# Fetch new tags from the pico-sdk repository
+# and check out the version you want to upgrade to.
+# After, you'll be in a detached head state.
+# That is ok.
+git fetch --tags
+git checkout <pico-sdk-release-tag-name>
+
+# Update all of Pico SDK's submodules
+git submodule update --init --recursive
+
+# Go back to the repository's top level
+# and commit the submodule's changes.
+cd ../..
+git add lib/pico-sdk
+git commit
+```
+
+### Update the Tags Used in the Dockerfile
+
+The Docker file specifies tag versions for pico-sdk and picotool. These lines should be updated accordingly:
+
+```dockerfile
+RUN git clone https://github.com/raspberrypi/pico-sdk.git --branch 2.2.0
+
+...
+
+RUN git clone https://github.com/raspberrypi/picotool.git --branch 2.2.0-a4
+```
