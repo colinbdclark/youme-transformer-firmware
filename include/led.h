@@ -2,18 +2,16 @@
 
 class LED {
 public:
-    bool isOn;
     uint8_t gpioPin;
+    bool isOn;
 
-    pico_error_codes init(uint8_t gpioPin) {
+    void init(uint8_t gpioPin) {
         this->gpioPin = gpioPin;
         this->isOn = false;
 
         gpio_init(gpioPin);
         gpio_set_dir(gpioPin, GPIO_OUT);
         gpio_put(gpioPin, 0);
-
-        return PICO_OK;
     }
 
     void on() {

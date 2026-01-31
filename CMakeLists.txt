@@ -21,6 +21,8 @@ set(PICO_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib/pico-sdk)
 include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
 
+set(PICO_TINYUSB_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb)
+
 # Compiler settings
 project(${NAME} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
@@ -31,11 +33,10 @@ pico_sdk_init()
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
 
-set(PICO_TINYUSB_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb)
-
 set(SOURCE_FILES
     src/passthrough.cpp
     src/usb_descriptors.c
+    src/midi-parser.c
 )
 
 add_executable(${NAME}

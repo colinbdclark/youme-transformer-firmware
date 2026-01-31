@@ -1,88 +1,84 @@
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "midi_uart_lib_config.h"
-#include "midi_uart_lib.h"
-#include "tusb.h"
-#include "class/midi/midi_device.h"
 #include "led.h"
+#include "midi-parser.h"
+#include "uart-midi.h"
+#include "usb-midi.h"
+#include "midi-logger.h"
 
 #define CPU_CLOCK_SPEED_KHZ 240000
-#define LED_PIN 25
-#define LED_DELAY_MS 250
 
 #define MIDI_UART_NUM 0
 #define MIDI_UART_TX_GPIO 0
 #define MIDI_UART_RX_GPIO 1
 
 #define READ_BUFFER_SIZE 128
+#define LOG_BUFFER_SIZE 1024 * 100
 
-LED led;
-void* midi_uart;
-uint8_t uartReadBuffer[READ_BUFFER_SIZE] = {0};
-constexpr size_t uartReadBufferSize = sizeof(uartReadBuffer);
-bool isMountedAsUSBMIDIDevice = false;
-size_t numUARTTXDroppedBytes = 0;
-size_t numUSBTXDroppedBytes = 0;
+LED mainLED;
+LED noteLED;
+UARTMidi<READ_BUFFER_SIZE> midiUART;
+USBMidi<READ_BUFFER_SIZE> usbMIDI;
+MIDILogger<LOG_BUFFER_SIZE> midiLogger;
+struct sig_MidiParser midiParser;
 
-void writeToUART(uint8_t* buffer, uint32_t numBytes) {
-    uint8_t bytesWritten = midi_uart_write_tx_buffer(
-            midi_uart, buffer, numBytes);
+void onMIDIMessage(uint8_t* message, size_t size, void* userData) {
+    (void)userData;
 
-    if (bytesWritten < numBytes) {
-        numUARTTXDroppedBytes += (numBytes - bytesWritten);
+    // Light up the LED when notes are on.
+    if (sig_MIDI_MESSAGE_TYPE(message[0]) == sig_MIDI_STATUS_NOTE_ON &&
+        message[2] > 0) {
+        noteLED.on();
+    } else if (sig_MidiParser_isNoteOff(message)) {
+        noteLED.off();
     }
 
-    midi_uart_drain_tx_buffer(midi_uart);
+    (void) midiUART.write(message, size);
+    (void) usbMIDI.write(message, size);
+    midiLogger.write(message, size);
 }
 
-void writeToUSBMIDI(uint8_t* buffer, uint32_t numBytes) {
-    if (!tud_midi_mounted()) {
-        // Don't treat bytes not written due to an
-        // unmounted device as dropped.
-        return;
-    }
+void onSysexChunk(uint8_t* sysexData, size_t size, bool isFinal,
+    void* userData) {
+    (void)userData;
+    (void)isFinal;
 
-    uint32_t bytesWritten = tud_midi_stream_write(
-        0, buffer, numBytes);
-
-    if (bytesWritten < numBytes) {
-        numUSBTXDroppedBytes += (numBytes - bytesWritten);
-    }
+    (void) midiUART.write(sysexData, size);
+    (void) usbMIDI.write(sysexData, size);
 }
 
 void midiDataPassthroughLoop() {
-    uint8_t numBytesRead = midi_uart_poll_rx_buffer(
-        midi_uart, uartReadBuffer, uartReadBufferSize);
+    uint8_t numBytesRead = midiUART.read();
 
     if (numBytesRead == 0) {
         return;
     }
 
-    writeToUART(uartReadBuffer, numBytesRead);
-    writeToUSBMIDI(uartReadBuffer, numBytesRead);
+    sig_MidiParser_feedBytes(&midiParser, midiUART.readBuffer, numBytesRead);
 }
 
 int main() {
     set_sys_clock_khz(CPU_CLOCK_SPEED_KHZ, true);
 
-    // Turn on the LED.
-    // TODO: Flash this when MIDI messages are received.
-    int rc = led.init(LED_PIN);
-    hard_assert(rc == PICO_OK);
-    led.on();
+    mainLED.init(25);
+    mainLED.on();
+    noteLED.init(24);
 
-    // Set MIDI TRS.
-    midi_uart = midi_uart_configure(
-        MIDI_UART_NUM, MIDI_UART_TX_GPIO, MIDI_UART_RX_GPIO);
+    midiUART.init(MIDI_UART_NUM, MIDI_UART_TX_GPIO, MIDI_UART_RX_GPIO);
+    usbMIDI.init();
 
-    // Set up as a USB MIDI device on the Host/PWR port.
-    tusb_init();
+    sig_MidiParser_init(&midiParser, onMIDIMessage, onSysexChunk, NULL);
+
+    midiLogger.init();
 
     while (true) {
-        tud_task();
+        usbMIDI.tick();
         midiDataPassthroughLoop();
     }
 
-    led.off();
+    noteLED.off();
+    mainLED.off();
+
     return 0;
 }
