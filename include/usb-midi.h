@@ -1,28 +1,49 @@
+#pragma once
+
 #include "tusb.h"
 #include "class/midi/midi_device.h"
+#include "midi-port.h"
 
 template<size_t readBufferSize>
-class USBMidi {
+class USBMidiDevicePort: MidiPort {
 public:
     uint8_t readBuffer[readBufferSize] = {0};
     size_t numTXBytesDropped = 0;
-    size_t numRXBytesDropped = 0;
     void* midi_uart;
 
-    void init() {
+    void init(
+        sig_MidiParser_MessageCallback onMIDIMessage,
+        sig_MidiParser_SysexChunkCallback onSysexChunk,
+        void* userData = NULL) {
         tusb_init();
+        this->initParser(onMIDIMessage, onSysexChunk,
+            userData);
     }
 
     void tick() {
         tud_task();
     }
 
-    uint8_t read() {
-        // TODO: Implement reading from host to this MIDI device
-        return 0;
+    size_t read() {
+        if (!tud_midi_mounted()) {
+            return 0;
+        }
+
+
+        uint32_t numBytesRead = tud_midi_stream_read(this->readBuffer, readBufferSize);
+
+        if (numBytesRead == 0) {
+            return 0;
+        }
+
+        sig_MidiParser_feedBytes(&this->midiParser,
+            this->readBuffer, numBytesRead);
+
+        return numBytesRead;
+
     }
 
-    uint8_t write(uint8_t* buffer, uint32_t numBytes) {
+    size_t write(uint8_t* buffer, uint32_t numBytes) {
         if (!tud_midi_mounted()) {
             // Bytes that we can't write because the USB port isn't ready
             // don't count as dropped.

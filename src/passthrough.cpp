@@ -2,7 +2,7 @@
 #include "hardware/clocks.h"
 #include "midi_uart_lib_config.h"
 #include "led.h"
-#include "midi-parser.h"
+#include "midi-port.h"
 #include "uart-midi.h"
 #include "usb-midi.h"
 #include "midi-logger.h"
@@ -18,14 +18,11 @@
 
 LED mainLED;
 LED noteLED;
-UARTMidi<READ_BUFFER_SIZE> midiUART;
-USBMidi<READ_BUFFER_SIZE> usbMIDI;
+UARTMidiPort<READ_BUFFER_SIZE> uartMidiPort;
+USBMidiDevicePort<READ_BUFFER_SIZE> usbMidiDevicePort;
 MIDILogger<LOG_BUFFER_SIZE> midiLogger;
-struct sig_MidiParser midiParser;
 
-void onMIDIMessage(uint8_t* message, size_t size, void* userData) {
-    (void)userData;
-
+void handleLEDStateForMIDIMessage(uint8_t* message) {
     // Light up the LED when notes are on.
     if (sig_MIDI_MESSAGE_TYPE(message[0]) == sig_MIDI_STATUS_NOTE_ON &&
         message[2] > 0) {
@@ -33,9 +30,27 @@ void onMIDIMessage(uint8_t* message, size_t size, void* userData) {
     } else if (sig_MidiParser_isNoteOff(message)) {
         noteLED.off();
     }
+}
 
-    (void) midiUART.write(message, size);
-    (void) usbMIDI.write(message, size);
+void writeMessageFromUART(uint8_t* message, size_t size) {
+    (void) uartMidiPort.write(message, size);
+    (void) usbMidiDevicePort.write(message, size);
+}
+
+void writeMessageFromUSBDevice(uint8_t* message, size_t size) {
+    // Only write to the UART; don't echo the message back to USB.
+    (void) uartMidiPort.write(message, size);
+}
+
+void onMIDIMessage(uint8_t* message, size_t size, void* userData) {
+    handleLEDStateForMIDIMessage(message);
+
+    if (userData == &uartMidiPort) {
+        writeMessageFromUART(message, size);
+    } else if (userData == &usbMidiDevicePort) {
+        writeMessageFromUSBDevice(message, size);
+    }
+
     midiLogger.write(message, size);
 }
 
@@ -44,37 +59,26 @@ void onSysexChunk(uint8_t* sysexData, size_t size, bool isFinal,
     (void)userData;
     (void)isFinal;
 
-    (void) midiUART.write(sysexData, size);
-    (void) usbMIDI.write(sysexData, size);
-}
-
-void midiDataPassthroughLoop() {
-    uint8_t numBytesRead = midiUART.read();
-
-    if (numBytesRead == 0) {
-        return;
-    }
-
-    sig_MidiParser_feedBytes(&midiParser, midiUART.readBuffer, numBytesRead);
+    (void) uartMidiPort.write(sysexData, size);
+    (void) usbMidiDevicePort.write(sysexData, size);
 }
 
 int main() {
     set_sys_clock_khz(CPU_CLOCK_SPEED_KHZ, true);
 
     mainLED.init(25);
-    mainLED.on();
     noteLED.init(24);
 
-    midiUART.init(MIDI_UART_NUM, MIDI_UART_TX_GPIO, MIDI_UART_RX_GPIO);
-    usbMIDI.init();
-
-    sig_MidiParser_init(&midiParser, onMIDIMessage, onSysexChunk, NULL);
-
+    uartMidiPort.init(DEFAULT_UART_CONFIG, onMIDIMessage, onSysexChunk, &uartMidiPort);
+    usbMidiDevicePort.init(onMIDIMessage, onSysexChunk, &usbMidiDevicePort);
     midiLogger.init();
 
+    mainLED.on();
+
     while (true) {
-        usbMIDI.tick();
-        midiDataPassthroughLoop();
+        usbMidiDevicePort.tick();
+        (void) uartMidiPort.read();
+        (void) usbMidiDevicePort.read();
     }
 
     noteLED.off();

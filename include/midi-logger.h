@@ -1,3 +1,5 @@
+#pragma once
+
 template <size_t LOG_BUFFER_SIZE>
 class MIDILogger {
 public:
