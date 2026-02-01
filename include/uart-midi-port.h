@@ -17,8 +17,8 @@ static const UARTConfig DEFAULT_UART_CONFIG = {
 };
 
 template<size_t messageBufferSize = 4,
-        size_t sysexBufferSize = 32,
-        size_t readBufferSize = 128>
+    size_t sysexBufferSize = 32,
+    size_t readBufferSize = 4>
 class UARTMidiPort: MidiPort<
     messageBufferSize, sysexBufferSize, readBufferSize> {
 public:
@@ -32,25 +32,26 @@ public:
     }
 
     void tick() {
-        (void) read();
+        read();
     }
 
-    size_t read() {
-        size_t numBytesRead = midi_uart_poll_rx_buffer(
-            midi_uart,
-            this->readBuffer,
-            readBufferSize);
+    inline size_t readBlock() {
+        return midi_uart_poll_rx_buffer(midi_uart,
+            this->readBuffer, readBufferSize);
+    }
 
-        if (numBytesRead == 0) {
-            return 0;
+    void read() {
+        size_t numBytesRead = readBlock();
+
+        while (numBytesRead > 0) {
+            size_t bytesToFeed = std::min(numBytesRead,
+                readBufferSize);
+
+            sig_MidiParser_feedBytes(&this->midiParser,
+                this->readBuffer, bytesToFeed);
+
+            numBytesRead = readBlock();
         }
-
-        size_t bytesToFeed = std::min(numBytesRead,
-            readBufferSize);
-
-        sig_MidiParser_feedBytes(&this->midiParser, this->readBuffer, bytesToFeed);
-
-        return numBytesRead;
     }
 
     size_t write(uint8_t* buffer, uint32_t numBytes) {

@@ -1,16 +1,16 @@
 #pragma once
 
-#include <algorithm>
 #include "tusb.h"
 #include "class/midi/midi_device.h"
 #include "midi-port.h"
 
 template<size_t messageBufferSize = 4,
-        size_t sysexBufferSize = 32,
-        size_t readBufferSize = 128>
+    size_t sysexBufferSize = 32,
+    size_t readBufferSize = 4>
 class USBMidiDevicePort: MidiPort<
     messageBufferSize, sysexBufferSize, readBufferSize> {
 public:
+    static constexpr size_t USB_MIDI_PACKET_SIZE = 4;
 
     void init(MidiParserConfig parserConfig = MidiParserConfig()) {
         tusb_init();
@@ -22,25 +22,12 @@ public:
         read();
     }
 
-    size_t read() {
-        if (!tud_midi_mounted()) {
-            return 0;
+    void read() {
+        while (tud_midi_available()) {
+            (void) tud_midi_packet_read(this->readBuffer);
+            sig_MidiParser_feedBytes(&this->midiParser,
+                this->readBuffer, USB_MIDI_PACKET_SIZE);
         }
-
-        size_t numBytesRead = tud_midi_stream_read(
-            this->readBuffer, readBufferSize);
-
-        if (numBytesRead == 0) {
-            return 0;
-        }
-
-        size_t bytesToFeed = std::min(numBytesRead,
-            readBufferSize);
-
-        sig_MidiParser_feedBytes(&this->midiParser,
-            this->readBuffer, bytesToFeed);
-
-        return numBytesRead;
     }
 
     size_t write(uint8_t* buffer, uint32_t numBytes) {
