@@ -115,8 +115,6 @@ int main() {
     mainLED.on();
 
     while (true) {
-        tuh_task();
-
         uartMidiPort.tick();
         usbDevice.tick();
         usbHost.tick();
