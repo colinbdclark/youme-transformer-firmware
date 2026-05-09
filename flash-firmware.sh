@@ -6,4 +6,14 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-$PICO_OPENOCD_PATH/openocd -s $PICO_OPENOCD_PATH/scripts -f interface/cmsis-dap.cfg -f target/rp2350.cfg -c "adapter speed 5000" -c "program $1 verify reset exit"
+# Use reset halt rather than reset exit: halting the CPU drops the USB D+
+# pullup immediately, giving the host time to register a disconnect before
+# the firmware re-initialises USB on resume.
+$PICO_OPENOCD_PATH/openocd -s $PICO_OPENOCD_PATH/scripts \
+    -f interface/cmsis-dap.cfg -f target/rp2350.cfg \
+    -c "adapter speed 5000" \
+    -c "program $1 verify" \
+    -c "reset halt" \
+    -c "sleep 1500" \
+    -c "resume" \
+    -c "shutdown"

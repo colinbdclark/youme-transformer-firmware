@@ -35,10 +35,27 @@ pico_sdk_init()
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/midi_uart_lib)
 add_subdirectory(${PICO_PIO_USB_PATH})
 
+set(MQUICKJS_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/mquickjs)
+
+add_library(mquickjs STATIC
+    ${MQUICKJS_PATH}/mquickjs.c
+    ${MQUICKJS_PATH}/dtoa.c
+    ${MQUICKJS_PATH}/libm.c
+    ${MQUICKJS_PATH}/cutils.c
+)
+
+target_include_directories(mquickjs PUBLIC
+    ${MQUICKJS_PATH}
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
+target_compile_options(mquickjs PRIVATE -Wno-format)
+
 set(SOURCE_FILES
     src/passthrough.cpp
     src/usb_descriptors.c
     src/midi-parser.c
+    src/js-stdlib.c
 )
 
 add_executable(${NAME}
@@ -48,6 +65,10 @@ add_executable(${NAME}
 # Be pedantic about warnings.
 set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_OPTIONS "-Wextra;-Wpedantic")
 
+# js-stdlib.c includes a generated C header with non-constant initializers
+# that -Wpedantic rejects. Relax to -Wextra only for that file.
+set_source_files_properties(src/js-stdlib.c PROPERTIES COMPILE_OPTIONS "-Wextra")
+
 target_include_directories(${NAME} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
@@ -56,10 +77,12 @@ target_link_libraries(${NAME}
     pico_bootsel_via_double_reset
     pico_pio_usb
     pico_stdlib
+    pico_unique_id
     ring_buffer_lib
     midi_uart_lib
     tinyusb_device
     tinyusb_host
+    mquickjs
 )
 
 target_compile_definitions(${NAME} PRIVATE PIO_USB_USE_TINYUSB)

@@ -6,7 +6,7 @@
 #include "uart-midi-port.h"
 #include "usb-midi-device-port.h"
 #include "usb-midi-host-port.h"
-#include "midi-logger.h"
+#include "js-engine.h"
 
 #define CPU_CLOCK_SPEED_KHZ 240000
 
@@ -20,6 +20,8 @@ LED noteLED;
 UARTMidiPort uartMidiPort;
 USBMidiDevicePort usbDevice;
 USBMidiHostPort usbHost;
+JSEngine<8192> js;
+const char* src = "function sayHello() {console.log('hello microcontroller!');}";
 
 void handleLEDStateForMIDIMessage(uint8_t* message) {
     // Light up the LED when notes are on.
@@ -29,6 +31,9 @@ void handleLEDStateForMIDIMessage(uint8_t* message) {
     } else if (sig_MidiParser_isNoteOff(message)) {
         noteLED.off();
     }
+
+    JSValue val = js.applyFn("sayHello", NULL, 0);
+    (void) val;
 }
 
 void writeMessageFromUART(uint8_t* message, size_t size,
@@ -81,6 +86,8 @@ void onSysexChunk(uint8_t* sysexData, size_t size, void* userData,
 int main() {
     set_sys_clock_khz(CPU_CLOCK_SPEED_KHZ, true);
 
+    stdio_init_all();
+
     mainLED.init(25);
     noteLED.init(24);
 
@@ -111,12 +118,15 @@ int main() {
     };
     usbHost.init(USB_HOST_DP_GPIO, usbHostParserConfig);
 
+    js.init();
+    js.eval(src, strlen(src));
     mainLED.on();
 
     while (true) {
         uartMidiPort.tick();
         usbDevice.tick();
         usbHost.tick();
+        js.tick();
     }
 
     noteLED.off();

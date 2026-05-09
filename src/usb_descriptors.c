@@ -24,6 +24,7 @@
  */
 
 #include "tusb.h"
+#include "pico/unique_id.h"
 
 /* A combination of interfaces must have a unique product id, since PC will save device driver after the first plug.
  * Same VID/PID with different interface e.g MSC (first), then CDC (later) will possibly cause system error on PC.
@@ -73,25 +74,27 @@ uint8_t const * tud_descriptor_device_cb(void)
 
 enum
 {
-  ITF_NUM_MIDI = 0,
+  ITF_NUM_CDC = 0,
+  ITF_NUM_CDC_DATA,
+  ITF_NUM_MIDI,
   ITF_NUM_MIDI_STREAMING,
   ITF_NUM_TOTAL
 };
 
-#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_MIDI_DESC_LEN)
+#define EPNUM_MIDI      0x01
+#define EPNUM_CDC_NOTIF 0x82
+#define EPNUM_CDC_OUT   0x02
+#define EPNUM_CDC_IN    0x83
 
-#if CFG_TUSB_MCU == OPT_MCU_LPC175X_6X || CFG_TUSB_MCU == OPT_MCU_LPC177X_8X || CFG_TUSB_MCU == OPT_MCU_LPC40XX
-  // LPC 17xx and 40xx endpoint type (bulk/interrupt/iso) are fixed by its number
-  // 0 control, 1 In, 2 Bulk, 3 Iso, 4 In etc ...
-  #define EPNUM_MIDI   0x02
-#else
-  #define EPNUM_MIDI   0x01
-#endif
+#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN)
 
 uint8_t const desc_fs_configuration[] =
 {
   // Config number, interface count, string index, total length, attribute, power in mA
   TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
+
+  // Interface number, string index, EP notification address, EP notification size, EP data Out & In address, EP data size
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
 
   // Interface number, string index, EP Out & EP In address, EP size
   TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, 0, EPNUM_MIDI, 0x80 | EPNUM_MIDI, 64)
@@ -102,6 +105,9 @@ uint8_t const desc_hs_configuration[] =
 {
   // Config number, interface count, string index, total length, attribute, power in mA
   TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
+
+  // Interface number, string index, EP notification address, EP notification size, EP data Out & In address, EP data size
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
 
   // Interface number, string index, EP Out & EP In address, EP size
   TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, 0, EPNUM_MIDI, 0x80 | EPNUM_MIDI, 512)
@@ -131,10 +137,10 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 char const* string_desc_arr [] =
 {
   (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
-  "Lichen.coop",         // 1: Manufacturer
-  "YouMe Transformer",   // 2: Product
-  // TODO: Generate this dynamically with pico_get_unique_board_id_string()
-  NULL,                  // 3: Serials, should use chip ID
+  "Lichen.coop", // 1: Manufacturer
+  "YouMe Transformer", // 2: Product
+  NULL, // 3: Serial number, generated from chip ID in tud_descriptor_string_cb
+  "YouMe Transformer Serial", // 4: CDC interface
 };
 
 static uint16_t _desc_str[32];
@@ -158,7 +164,15 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 
     if ( !(index < sizeof(string_desc_arr)/sizeof(string_desc_arr[0])) ) return NULL;
 
-    const char* str = string_desc_arr[index];
+    char board_id[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+    const char* str;
+
+    if (index == 3) {
+      pico_get_unique_board_id_string(board_id, sizeof(board_id));
+      str = board_id;
+    } else {
+      str = string_desc_arr[index];
+    }
 
     // Cap at max char
     chr_count = strlen(str);
