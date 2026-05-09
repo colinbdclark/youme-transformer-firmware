@@ -7,6 +7,7 @@
 #include "usb-midi-device-port.h"
 #include "usb-midi-host-port.h"
 #include "js-engine.h"
+#include "js-midi.h"
 
 #define CPU_CLOCK_SPEED_KHZ 240000
 
@@ -21,26 +22,37 @@ UARTMidiPort uartMidiPort;
 USBMidiDevicePort usbDevice;
 USBMidiHostPort usbHost;
 JSEngine<8192> js;
-const char* src = "function sayHello() {console.log('hello microcontroller!');}";
+const char* src = "function onMIDI(msg) {console.log(msg.type, msg.note, msg.velocity);}";
 
-void handleLEDStateForMIDIMessage(uint8_t* message) {
-    // Light up the LED when notes are on.
-    if (sig_MIDI_MESSAGE_TYPE(message[0]) == sig_MIDI_STATUS_NOTE_ON &&
-        message[2] > 0) {
+void handleMIDINoteMessage(uint8_t* message) {
+    uint8_t channel = sig_MIDI_CHANNEL(message[0]);
+    uint8_t noteNum = message[1];
+    uint8_t velocity = message[2];
+
+    if (sig_MIDI_MESSAGE_TYPE(message[0]) == sig_MIDI_STATUS_NOTE_ON && velocity > 0) {
         noteLED.on();
+
+        JSValue args[] = {
+            JSMidi::noteOn(js.ctx, channel, noteNum, velocity)
+        };
+
+        js.applyFn("onMIDI", args, 1);
     } else if (sig_MidiParser_isNoteOff(message)) {
         noteLED.off();
-    }
 
-    JSValue val = js.applyFn("sayHello", NULL, 0);
-    (void) val;
+        JSValue args[] = {
+            JSMidi::noteOff(js.ctx, channel, noteNum, velocity)
+        };
+
+        js.applyFn("onMIDI", args, 1);
+    }
 }
 
 void writeMessageFromUART(uint8_t* message, size_t size,
     void* userData) {
     (void) userData;
 
-    handleLEDStateForMIDIMessage(message);
+    handleMIDINoteMessage(message);
 
     // Write to all output ports.
     uartMidiPort.write(message, size);
@@ -52,7 +64,7 @@ void writeMessageFromUSBDevice(uint8_t* message, size_t size,
     void* userData) {
     (void) userData;
 
-    handleLEDStateForMIDIMessage(message);
+    handleMIDINoteMessage(message);
 
     // Only write to the UART and USB host port;
     // don't echo the message back to the USB device port.
@@ -64,7 +76,7 @@ void writeMessageFromUSBHost(uint8_t* message, size_t size,
     void* userData) {
     (void) userData;
 
-    handleLEDStateForMIDIMessage(message);
+    handleMIDINoteMessage(message);
 
     // Only write to the UART and USB device port;
     // don't echo the message back to the USB host port.
