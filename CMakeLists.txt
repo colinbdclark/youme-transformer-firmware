@@ -53,6 +53,7 @@ target_include_directories(${NAME} PRIVATE
 )
 
 target_link_libraries(${NAME}
+    pico_bootsel_via_double_reset
     pico_pio_usb
     pico_stdlib
     ring_buffer_lib
@@ -64,11 +65,6 @@ target_link_libraries(${NAME}
 target_compile_definitions(${NAME} PRIVATE PIO_USB_USE_TINYUSB)
 
 pico_add_extra_outputs(${NAME})
-
-# By default, UART0 is reserved for stdio.
-# It needs to be disabled for YouMeTransformer
-# v1.0 hardware, which uses UART0 for MIDI.
-pico_enable_stdio_uart(${NAME} 0)
 
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/${NAME}.uf2

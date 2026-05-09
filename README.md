@@ -42,7 +42,7 @@ Nikhil Dabas provides a [Windows GUI installer for the Pico toolchain](https://w
 
 Raspberry Pi provides a [setup script for Raspberry Pi OS-based Linux](https://github.com/raspberrypi/pico-setup).
 
-### Clone and Update Submodules
+### Clone and Update Required Submodules
 
 This project includes submodules for the Pico SDK, TinyUSB, and several Pico MIDI-related libraries that are required for it to compile. 
 
