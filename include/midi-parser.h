@@ -9,6 +9,11 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+enum sig_MidiParser_Status {
+    sig_MidiParser_Status_SUCCESS = 0,
+    sig_MidiParser_Status_BUFFER_TOO_SMALL
+};
+
 /**
  * MIDI Status Byte Constants
  *
@@ -94,17 +99,36 @@ void sig_MidiParser_noOpMessageCallback(
  * @param sysexData pointer to the SysEx data chunk
  * @param size size of the SysEx data chunk
  * @param userData user context pointer passed during parser initialization
- * @param isFinal true if this chunk is the final chunk of the SysEx message
  */
 typedef void (*sig_MidiParser_SysexChunkCallback)(
-    uint8_t* sysexData, size_t size, void* userData, bool isFinal);
+    uint8_t* sysexData, size_t size, void* userData);
+
+/**
+ * @brief End of Sysex transmission callback.
+ *
+ * This is callback will be invoked once per complete SysEx transmission,
+ * after all chunk callbacks have fired. It receives the final chunk of data.
+ *
+ * @param sysexData pointer to the final chunk of SysEx data
+ * @param size size of the final chunk in bytes
+ * @param userData user context pointer passed during parser initialization
+ */
+typedef void (*sig_MidiParser_SysexEndCallback)(
+    uint8_t* sysexData, size_t size, void* userData);
 
 /**
  * @brief A sysex chunk callback that does nothing.
  * This can be used if you don't need sysex support.
  */
 void sig_MidiParser_noOpSysexCallback(
-    uint8_t* sysexData, size_t size, void* userData, bool isFinal);
+    uint8_t* sysexData, size_t size, void* userData);
+
+/**
+ * @brief A sysex end callback that does nothing.
+ * This can be used if you don't need sysex support.
+ */
+void sig_MidiParser_noOpSysexEndCallback(
+    uint8_t* sysexData, size_t size, void* userData);
 
 /**
  * Signaletic MIDI Parser
@@ -116,6 +140,7 @@ void sig_MidiParser_noOpSysexCallback(
 struct sig_MidiParser {
     sig_MidiParser_MessageCallback callback;
     sig_MidiParser_SysexChunkCallback sysexCallback;
+    sig_MidiParser_SysexEndCallback sysexEndCallback;
     void* userData;
 
     uint8_t runningStatusByte;
@@ -128,6 +153,8 @@ struct sig_MidiParser {
     uint8_t* sysexBuffer;
     size_t sysexBufferSize;
     uint32_t sysexWriteIdx;
+
+    uint8_t realtimeByte;
 };
 
 /**
@@ -141,13 +168,16 @@ void sig_MidiParser_reset(struct sig_MidiParser* self);
  * @param self the parser instance.
  * @param callback a callback function that will be called when non-SysEx MIDI messages are complete
  * @param sysexCallback a callback function that will be called when SysEx data chunks are received
+ * @param sysexEndCallback a callback function that will be called when a SysEx message is complete
  * @param userData user context that will be passed to all callbacks
+ * @return the status code
  */
-void sig_MidiParser_init(struct sig_MidiParser* self,
+enum sig_MidiParser_Status sig_MidiParser_init(struct sig_MidiParser* self,
     uint8_t* messageBuffer, size_t messageBufferSize,
     uint8_t* sysexBuffer, size_t sysexBufferSize,
     sig_MidiParser_MessageCallback callback,
     sig_MidiParser_SysexChunkCallback sysexCallback,
+    sig_MidiParser_SysexEndCallback sysexEndCallback,
     void* userData);
 
 /**
@@ -213,13 +243,6 @@ void sig_MidiParser_feedByte(struct sig_MidiParser* self, uint8_t byte);
  */
 void sig_MidiParser_feedBytes(struct sig_MidiParser* self,
     uint8_t* buffer, size_t len);
-
-/**
- * Reset the parser state (e.g., on disconnection or error recovery).
- *
- * @param parser the MIDI parser instance.
- */
-void sig_MidiParser_reset(struct sig_MidiParser* parser);
 
 #ifdef __cplusplus
 }

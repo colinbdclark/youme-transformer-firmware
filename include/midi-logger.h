@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 template <size_t LOG_BUFFER_SIZE>
 class MIDILogger {
 public:

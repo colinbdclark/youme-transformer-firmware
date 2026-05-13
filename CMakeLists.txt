@@ -37,6 +37,43 @@ add_subdirectory(${PICO_PIO_USB_PATH})
 
 set(MQUICKJS_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/mquickjs)
 
+# Geneate Micro QuickJS JavaScript Standard Library and Bindings
+include(ExternalProject)
+
+ExternalProject_Add(js_stdlib_generator
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/code-generation
+    BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator
+    CMAKE_ARGS -DMQUICKJS_PATH=${MQUICKJS_PATH}
+    BUILD_BYPRODUCTS
+        ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-js-stdlib
+        ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-mquickjs-atoms
+    INSTALL_COMMAND ""
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/include/js-stdlib-table.h
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-js-stdlib -m32
+        > ${CMAKE_CURRENT_SOURCE_DIR}/include/js-stdlib-table.h
+    DEPENDS js_stdlib_generator
+    COMMENT "Generating include/js-stdlib-table.h"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/include/mquickjs_atom.h
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-mquickjs-atoms -a -m32
+        > ${CMAKE_CURRENT_SOURCE_DIR}/include/mquickjs_atom.h
+    DEPENDS js_stdlib_generator
+    COMMENT "Generating include/mquickjs_atom.h"
+    VERBATIM
+)
+
+add_custom_target(js_stdlib_table
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/js-stdlib-table.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/mquickjs_atom.h
+)
+
 add_library(mquickjs STATIC
     ${MQUICKJS_PATH}/mquickjs.c
     ${MQUICKJS_PATH}/dtoa.c
@@ -53,6 +90,7 @@ target_compile_options(mquickjs PRIVATE -Wno-format)
 
 set(SOURCE_FILES
     src/passthrough.cpp
+    src/usb-midi-host-port.cpp
     src/usb_descriptors.c
     src/midi-parser.c
     src/js-stdlib.c
@@ -61,6 +99,8 @@ set(SOURCE_FILES
 add_executable(${NAME}
     ${SOURCE_FILES}
 )
+
+add_dependencies(${NAME} js_stdlib_table)
 
 # Be pedantic about warnings.
 set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_OPTIONS "-Wextra;-Wpedantic")

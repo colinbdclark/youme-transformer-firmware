@@ -63,13 +63,14 @@ static JSTimer js_timer_list[MAX_TIMERS];
 
 static JSValue js_setTimeout(JSContext *ctx, JSValue *this_val,
     int argc, JSValue *argv) {
-    (void) this_val; (void) argc;
+    (void) this_val;
     int delay, i;
     JSValue *pfunc;
 
-    if (!JS_IsFunction(ctx, argv[0]))
+    if (argc < 1 || !JS_IsFunction(ctx, argv[0]))
         return JS_ThrowTypeError(ctx, "not a function");
-    if (JS_ToInt32(ctx, &delay, argv[1]))
+    delay = 0;
+    if (argc >= 2 && JS_ToInt32(ctx, &delay, argv[1]))
         return JS_EXCEPTION;
     for (i = 0; i < MAX_TIMERS; i++) {
         JSTimer *th = &js_timer_list[i];
@@ -86,8 +87,10 @@ static JSValue js_setTimeout(JSContext *ctx, JSValue *this_val,
 
 static JSValue js_clearTimeout(JSContext *ctx, JSValue *this_val,
     int argc, JSValue *argv) {
-    (void) this_val; (void) argc;
+    (void) this_val;
     int timer_id;
+    if (argc < 1)
+        return JS_UNDEFINED;
     if (JS_ToInt32(ctx, &timer_id, argv[0]))
         return JS_EXCEPTION;
     if (timer_id >= 0 && timer_id < MAX_TIMERS) {
@@ -116,4 +119,4 @@ void tick_timers(JSContext *ctx) {
     }
 }
 
-#include "embedded_stdlib.h"
+#include "js-stdlib-table.h"

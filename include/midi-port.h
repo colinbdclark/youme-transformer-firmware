@@ -5,6 +5,7 @@
 struct MidiParserConfig {
     sig_MidiParser_MessageCallback onMIDIMessage = sig_MidiParser_noOpMessageCallback;
     sig_MidiParser_SysexChunkCallback onSysexChunk = sig_MidiParser_noOpSysexCallback;
+    sig_MidiParser_SysexEndCallback onSysexEnd = sig_MidiParser_noOpSysexEndCallback;
     void* userData = NULL;
 };
 
@@ -19,8 +20,8 @@ public:
     size_t numTXBytesDropped = 0;
     struct sig_MidiParser midiParser;
 
-    void initParser(MidiParserConfig config) {
-        sig_MidiParser_init(
+    enum sig_MidiParser_Status initParser(MidiParserConfig config) {
+        enum sig_MidiParser_Status status = sig_MidiParser_init(
             &this->midiParser,
             this->messageBuffer,
             messageBufferSize,
@@ -28,9 +29,10 @@ public:
             sysexBufferSize,
             config.onMIDIMessage,
             config.onSysexChunk,
+            config.onSysexEnd,
             config.userData
         );
+
+        return status;
     }
 };
-
-

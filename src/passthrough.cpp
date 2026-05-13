@@ -1,3 +1,4 @@
+#include <cstring>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "midi_uart_lib_config.h"
@@ -25,15 +26,16 @@ JSEngine<8192> js;
 const char* src = "function onMIDI(msg) {console.log(msg.type, msg.note, msg.velocity);}";
 
 void handleMIDINoteMessage(uint8_t* message) {
-    uint8_t channel = sig_MIDI_CHANNEL(message[0]);
+    uint8_t status = message[0];
     uint8_t noteNum = message[1];
     uint8_t velocity = message[2];
 
-    if (sig_MIDI_MESSAGE_TYPE(message[0]) == sig_MIDI_STATUS_NOTE_ON && velocity > 0) {
+    if (sig_MIDI_MESSAGE_TYPE(status == sig_MIDI_STATUS_NOTE_ON) &&
+        velocity > 0) {
         noteLED.on();
 
         JSValue args[] = {
-            JSMidi::noteOn(js.ctx, channel, noteNum, velocity)
+            JSMidi::noteOn(js.ctx, sig_MIDI_CHANNEL(status), noteNum, velocity)
         };
 
         js.applyFn("onMIDI", args, 1);
@@ -41,7 +43,7 @@ void handleMIDINoteMessage(uint8_t* message) {
         noteLED.off();
 
         JSValue args[] = {
-            JSMidi::noteOff(js.ctx, channel, noteNum, velocity)
+            JSMidi::noteOff(js.ctx, sig_MIDI_CHANNEL(status), noteNum, velocity)
         };
 
         js.applyFn("onMIDI", args, 1);
@@ -84,10 +86,17 @@ void writeMessageFromUSBHost(uint8_t* message, size_t size,
     usbDevice.write(message, size);
 }
 
-void onSysexChunk(uint8_t* sysexData, size_t size, void* userData,
-    bool isFinal) {
+void onSysexChunk(uint8_t* sysexData, size_t size, void* userData) {
     (void) userData;
-    (void) isFinal;
+
+    // TODO: Correctly handle sysex routing.
+    uartMidiPort.write(sysexData, size);
+    usbDevice.write(sysexData, size);
+    usbHost.write(sysexData, size);
+}
+
+void onSysexEnd(uint8_t* sysexData, size_t size, void* userData) {
+    (void) userData;
 
     // TODO: Correctly handle sysex routing.
     uartMidiPort.write(sysexData, size);
@@ -112,6 +121,7 @@ int main() {
     MidiParserConfig uartParserConfig = {
         .onMIDIMessage = writeMessageFromUART,
         .onSysexChunk = onSysexChunk,
+        .onSysexEnd = onSysexEnd,
         .userData = &uartMidiPort
     };
     uartMidiPort.init(uartConfig, uartParserConfig);
@@ -119,6 +129,7 @@ int main() {
     MidiParserConfig usbDeviceParserConfig = {
         .onMIDIMessage = writeMessageFromUSBDevice,
         .onSysexChunk = onSysexChunk,
+        .onSysexEnd = onSysexEnd,
         .userData = &usbDevice
     };
     usbDevice.init(usbDeviceParserConfig);
@@ -126,6 +137,7 @@ int main() {
     MidiParserConfig usbHostParserConfig = {
         .onMIDIMessage = writeMessageFromUSBHost,
         .onSysexChunk = onSysexChunk,
+        .onSysexEnd = onSysexEnd,
         .userData = &usbHost
     };
     usbHost.init(USB_HOST_DP_GPIO, usbHostParserConfig);

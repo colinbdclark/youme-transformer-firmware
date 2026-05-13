@@ -2,6 +2,7 @@
 set -e
 
 # Find the tty device for our board by USB VID (0xCAFE = 51966).
+# FIXME: This currently only works on macOS.
 find_board_device() {
     ioreg -r -c IOUSBHostDevice -l 2>/dev/null | python3 -c "
 import sys, re
@@ -16,11 +17,11 @@ echo "==> Compiling..."
 ./compile.sh
 
 echo ""
-echo "==> Flashing..."
+echo "Flashing..."
 ./flash-firmware.sh build/youme-transformer.elf
 
 echo ""
-echo "==> Waiting for device to enumerate..."
+echo "Waiting for device to enumerate..."
 DEVICE=""
 for i in $(seq 1 30); do
     sleep 1
@@ -35,6 +36,6 @@ if [ -z "$DEVICE" ]; then
     exit 1
 fi
 
-echo "==> Connected to $DEVICE (Ctrl-T Q to exit)"
+echo "Connected to $DEVICE (Ctrl-T Q to exit)"
 echo ""
 tio "$DEVICE"
