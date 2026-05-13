@@ -54,7 +54,9 @@ add_custom_command(
     OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/include/js-stdlib-table.h
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-js-stdlib -m32
         > ${CMAKE_CURRENT_SOURCE_DIR}/include/js-stdlib-table.h
-    DEPENDS js_stdlib_generator
+    DEPENDS
+        js_stdlib_generator
+        ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-js-stdlib
     COMMENT "Generating include/js-stdlib-table.h"
     VERBATIM
 )
@@ -63,7 +65,9 @@ add_custom_command(
     OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/include/mquickjs_atom.h
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-mquickjs-atoms -a -m32
         > ${CMAKE_CURRENT_SOURCE_DIR}/include/mquickjs_atom.h
-    DEPENDS js_stdlib_generator
+    DEPENDS
+        js_stdlib_generator
+        ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_generator/generate-mquickjs-atoms
     COMMENT "Generating include/mquickjs_atom.h"
     VERBATIM
 )

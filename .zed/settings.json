@@ -1,0 +1,13 @@
+{
+    "lsp": {
+        "clangd": {
+            "binary": {
+                "ignore_system_version": true,
+                "path": "$PICO_TOOLCHAIN_PATH/bin/arm-none-eabi-gcc",
+            },
+            "initialization_options": {
+                "compilationDatabasePath": "build",
+            },
+        },
+    },
+}

@@ -150,7 +150,6 @@ int main() {
         uartMidiPort.tick();
         usbDevice.tick();
         usbHost.tick();
-        js.tick();
     }
 
     noteLED.off();

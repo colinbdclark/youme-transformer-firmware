@@ -23,10 +23,6 @@ public:
         return JS_Eval(ctx, src, size, fileName, flags);
     }
 
-    void tick() {
-        tick_timers(ctx);
-    }
-
     JSValue applyFn(const char* fnName, JSValue* args, size_t numArgs, JSValue thiz = JS_NULL, int flags = 1) {
         // TODO: error handling:
         // - invalid property name

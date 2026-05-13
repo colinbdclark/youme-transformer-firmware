@@ -363,8 +363,11 @@ static const JSPropDef js_global_object[] = {
     JS_PROP_CLASS_DEF("performance", &js_performance_obj),
     JS_CFUNC_DEF("print", 1, js_print),
     JS_CFUNC_DEF("gc", 0, js_gc),
-    JS_CFUNC_DEF("setTimeout", 2, js_setTimeout),
-    JS_CFUNC_DEF("clearTimeout", 1, js_clearTimeout),
+
+    // TODO: Implement a reliable version of setTimeout/clearTimeout.
+    // Maybe with Pico alarms?
+    // JS_CFUNC_DEF("setTimeout", 2, js_setTimeout),
+    // JS_CFUNC_DEF("clearTimeout", 1, js_clearTimeout),
     JS_PROP_END,
 };
 
